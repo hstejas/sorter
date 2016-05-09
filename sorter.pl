@@ -61,31 +61,47 @@ sub sanitize($)
    return ($name, $year);
 }
 
+sub getData($$)
+{
+   $title = shift;
+   $year = shift;
+   
+   my $query='?t="'.$title.'"&type="movie"&y="'.$year.'"';
+   my $response = get($url.$query) or print "Couldn't get $query" and next;
+   my $dec_json = decode_json($response);
+   #print Dumper $dec_json;
+   return ($dec_json->{"Response"}, $dec_json->{"Title"}, $dec_json->{"Year"}, $dec_json->{"Rated"});
+}
+
 foreach(@names)
 {
    my $fname = $_;
    my ($name, $year) = sanitize($fname);
    #print "$name $year\n";
-   my $query='?t="'.$name.'"&type="movie"&y="'.$year.'"';
-   my $response = get($url.$query) or print "Couldnt get $query" and next;
-
-   my $dec_json = decode_json($response);
-   #print Dumper $dec_json;
-
-   if($dec_json->{"Response"} eq "True")
+   my $inp = "";
+   while (true)
    {
-      print $dec_json->{"Title"}." --> ".$dec_json->{"Year"}." --> ".$dec_json->{"Rated"}." \n";
-
-      print "Skip? ";
-      print "Skipping\n" and next if(<STDIN>=~/y/);
-
-      my $rating = $dec_json->{"Rated"};
-      # Remove \ or / like in N/A-> NA
-      $rating=~s/[\/\\]//;
-
-      my $dest = "$dest_dir/$rating";
-
-      make_path($dest) if(! -d $dest);
-      move("$src_dir/$fname", "$dest/$fname") or print "Could not move $fname\n $!";
+      my ($response, $title, $year, $rating) = getData($name, $year);
+      if($dec_json->{"Response"} eq "True")
+      {
+         print $dec_json->{"Title"}." --> ".$dec_json->{"Year"}." --> ".$dec_json->{"Rated"}." \n";
+   
+         print "Skip (s) or retry(r)? ";
+         chomp ( $inp = <STDIN>);
+         print "Skipping\n" and last if($inp=~/s/);
+         if($inp=~/r/)
+         {
+            strictCheck($name);
+         }
+   
+         my $rating = $dec_json->{"Rated"};
+         # Remove \ or / like in N/A-> NA
+         $rating=~s/[\/\\]//;
+   
+         my $dest = "$dest_dir/$rating";
+   
+         make_path($dest) if(! -d $dest);
+         move("$src_dir/$fname", "$dest/$fname") or print "Could not move $fname\n $!";
+      }
    }
 }
